@@ -1,0 +1,11 @@
+2024-11-29 19:49:26,229 - __main__ - WARNING - Config file not found.
+2024-11-29 19:50:43,919 - __main__ - WARNING - Config file not found.
+2024-11-29 19:50:43,922 - httpx - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 404 Not Found"
+2024-11-29 19:50:43,923 - root - ERROR - Resume generation error: model "llama2" not found, try pulling it first
+2024-11-29 19:50:43,926 - root - INFO - Resume PDF generated at resume.pdf
+2024-11-29 19:51:35,234 - __main__ - WARNING - Config file not found.
+2024-11-29 19:52:06,189 - httpx - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2024-11-29 19:52:55,375 - httpx - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2024-11-29 19:53:33,192 - httpx - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2024-11-29 19:53:38,751 - httpx - INFO - HTTP Request: POST http://127.0.0.1:11434/api/chat "HTTP/1.1 200 OK"
+2024-11-29 19:53:38,758 - root - INFO - Resume PDF generated at resume.pdf
