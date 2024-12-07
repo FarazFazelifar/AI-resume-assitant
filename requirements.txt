@@ -3,3 +3,4 @@ streamlit-lottie
 ollama 
 pyyaml 
 reportlab
+markdown

@@ -8,11 +8,18 @@ from enum import Enum, auto
 import ollama
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
-from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-from prompts import Prompts
+from utils import Prompts
+import markdown
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.lib.enums import TA_LEFT
+import io
+from html.parser import HTMLParser
 
-MODEL_NAME = "llama3.1:8b-instruct-q8_0"
+MODEL_NAME = "llama3.2:3b-instruct-fp16"
 
 class ResumeType(Enum):
     PROFESSIONAL = auto()
@@ -84,11 +91,21 @@ class ResumeGenerator:
                 {'role': 'user', 'content': f"Education: {json.dumps(self.user_profile.get('education', []))}"}
             ])['message']['content']
 
+            contact_info = ollama.chat(model=MODEL_NAME, messages=[
+                {'role': 'system', 'content': Prompts.CONTACT_INFO},
+                {'role': 'user', 'content': f"""Profile: {json.dumps(self.user_profile.get("name", "")),
+                                                        json.dumps(self.user_profile.get("email", "")),
+                                                        json.dumps(self.user_profile.get("phone", "")),
+                                                        json.dumps(self.user_profile.get("linkedin", "")),
+                                                                   }"""}    
+            ])['message']['content']
+
             return {
                 'professional_summary': professional_summary,
                 'work_experience': work_experience,
                 'skills': skills,
-                'education': education
+                'education': education,
+                'contact_info': contact_info
             }
         except Exception as e:
             logging.error(f"Resume generation error: {e}")
@@ -96,28 +113,115 @@ class ResumeGenerator:
 
 class ResumePDFGenerator:
     @staticmethod
-    def generate_pdf(resume_data: Dict[str, Any], output_path: str = 'resume.pdf'):
-        try:
-            pdf = SimpleDocTemplate(output_path, pagesize=letter)
-            styles = getSampleStyleSheet()
-            content = []
-
-            sections = [
-                ('Professional Summary', resume_data.get('professional_summary', '')),
-                ('Work Experience', resume_data.get('work_experience', '')),
-                ('Skills', resume_data.get('skills', '')),
-                ('Education', resume_data.get('education', ''))
-            ]
-
-            for title, text in sections:
-                content.append(Paragraph(title, styles['Heading1']))
-                content.append(Paragraph(text, styles['Normal']))
-                content.append(Spacer(1, 12))
-
-            pdf.build(content)
-            logging.info(f"Resume PDF generated at {output_path}")
-        except Exception as e:
-            logging.error(f"PDF generation error: {e}")
+    def generate_pdf(resume_sections, output_filename='resume.pdf'):
+        """
+        Generate a PDF from markdown-formatted resume sections
+        
+        :param resume_sections: Dictionary of resume sections with markdown content
+        :param output_filename: Path to save the output PDF
+        """
+        pdf_buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            pdf_buffer, 
+            pagesize=letter,
+            rightMargin=72,
+            leftMargin=72,
+            topMargin=72,
+            bottomMargin=18
+        )
+    
+        story = []
+        
+        styles = getSampleStyleSheet()
+        
+        styles.add(ParagraphStyle(
+            'ResumeHeader',
+            parent=styles['Heading1'],
+            fontSize=18,
+            spaceAfter=12,
+            textColor='navy',
+            alignment=TA_LEFT
+        ))
+        
+        styles.add(ParagraphStyle(
+            'ResumeSectionHeader',
+            parent=styles['Heading2'],
+            fontSize=14,
+            spaceAfter=10,
+            textColor='darkblue',
+            alignment=TA_LEFT
+        ))
+        
+        styles.add(ParagraphStyle(
+            'ResumeNormal',
+            parent=styles['Normal'],
+            fontSize=11,
+            spaceAfter=6,
+            alignment=TA_LEFT
+        ))
+        
+        class PDFHTMLParser(HTMLParser):
+            def __init__(self, styles):
+                super().__init__()
+                self.story = []
+                self.styles = styles
+                self.current_style = styles['ResumeNormal']
+                self.current_list = None
+            
+            def handle_starttag(self, tag, attrs):
+                if tag == 'h1':
+                    self.current_style = self.styles['ResumeHeader']
+                elif tag == 'h2':
+                    self.current_style = self.styles['ResumeSectionHeader']
+                elif tag in ['p', 'div']:
+                    self.current_style = self.styles['ResumeNormal']
+                elif tag == 'strong':
+                    self.current_style = ParagraphStyle(
+                        'ResumeBold',
+                        parent=self.styles['ResumeNormal'],
+                        fontName='Helvetica-Bold'
+                    )
+                elif tag == 'em':
+                    self.current_style = ParagraphStyle(
+                        'ResumeItalic',
+                        parent=self.styles['ResumeNormal'],
+                        fontName='Helvetica-Oblique'
+                    )
+                elif tag in ['ul', 'ol']:
+                    self.current_list = tag
+            
+            def handle_endtag(self, tag):
+                if tag in ['h1', 'h2', 'p', 'div', 'strong', 'em']:
+                    self.current_style = self.styles['ResumeNormal']
+                if tag in ['ul', 'ol']:
+                    self.current_list = None
+            
+            def handle_data(self, data):
+                if data.strip():
+                    if self.current_list == 'ul':
+                        data = f'• {data}'
+                    elif self.current_list == 'ol':
+                        data = f'- {data}'
+                    
+                    self.story.append(Paragraph(data, self.current_style))
+                    self.story.append(Spacer(1, 6))
+        
+        for section_name, section_content in resume_sections.items():
+            html = markdown.markdown(section_content, extensions=['fenced_code', 'tables'])
+            
+            parser = PDFHTMLParser(styles)
+            parser.feed(html)
+            
+            story.extend(parser.story)
+            
+            story.append(Spacer(1, 12))
+        
+        doc.build(story)
+        
+        with open(output_filename, 'wb') as f:
+            f.write(pdf_buffer.getvalue())
+        
+        print(f"Resume PDF created successfully: {output_filename}")
 
 def main():
     config_manager = ConfigManager()

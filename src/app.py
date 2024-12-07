@@ -2,6 +2,7 @@ import streamlit as st
 import json
 from main import ResumeGenerator, ResumePDFGenerator
 from streamlit_lottie import st_lottie
+from utils import Skills
 
 def load_lottie_file(filepath: str):
     with open(filepath, "r") as f:
@@ -20,7 +21,7 @@ def add_dynamic_fields(section, key_prefix):
     for i in range(num_entries):
         with st.expander(f'{section} Entry {i + 1}'):
             entry = {}
-            for field in ['company', 'role', 'duration'] if section == 'Experience' else ['institution', 'degree', 'graduation_year']:
+            for field in ['company', 'role', 'duration (YYYY/MM/DD- YYYY/MM/DD)'] if section == 'Experience' else ['institution', 'degree', 'graduation_year']:
                 st.write(f"Enter the {field.replace('_', ' ')}.")
                 entry[field] = st.text_input(field.replace('_', ' ').title(), key=f'{key_prefix}_{i}_{field}')
         entries.append(entry)
@@ -53,9 +54,7 @@ def main():
     st.header("💼 Skills")
     st.write("Select your key skills to showcase in the resume.")
     skills = st.multiselect(
-        'Select Skills', 
-        ['Python', 'Machine Learning', 'Data Analysis', 'JavaScript', 'React', 
-         'SQL', 'Cloud Computing', 'DevOps', 'Data Visualization']
+        'Select Skills', Skills.skills
     )
     
     # Dynamic Experience Entries
@@ -63,14 +62,6 @@ def main():
     
     # Dynamic Education Entries
     education = add_dynamic_fields('Education', 'edu')
-    
-    # Resume Type Selection
-    st.header("📄 Resume Preferences")
-    st.write("Choose the type of resume you want to generate.")
-    resume_type = st.selectbox(
-        'Resume Type', 
-        ['PROFESSIONAL', 'TECHNICAL', 'ACADEMIC', 'CREATIVE']
-    )
     
     # Generate Resume Button
     if st.button('Generate Resume'):
@@ -83,7 +74,6 @@ def main():
             "skills": skills,
             "experience": experience,
             "education": education,
-            "resume_type": resume_type
         }
         
         with st.spinner("Generating Resume..."):
@@ -99,7 +89,7 @@ def main():
             st.download_button(
                 label='📥 Download Resume',
                 data=pdf_file.read(),
-                file_name='resume.pdf',
+                file_name=f'{name}.pdf',
                 mime='application/pdf'
             )
 
